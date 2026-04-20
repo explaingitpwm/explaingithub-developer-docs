@@ -1,0 +1,17 @@
+.git/
+.gitignore
+.assetsignore
+node_modules/
+.docusaurus/
+build/
+docs/
+src/
+
+API-docs.md
+babel.config.js
+docusaurus.config.js
+openai-pagelayout.css
+package-lock.json
+package.json
+server.js
+sidebars.js
