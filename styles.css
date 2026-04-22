@@ -61,16 +61,18 @@ a {
   text-decoration: none;
 }
 
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 28px;
+.brand-logo-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 44px;
+}
+
+.brand-logo {
+  display: block;
+  width: auto;
   height: 28px;
-  border-radius: 8px;
-  background: #0f172a;
-  color: #ffffff;
-  font-size: 11px;
-  font-weight: 700;
 }
 
 .brand-copy {
