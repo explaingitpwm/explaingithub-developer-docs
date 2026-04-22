@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ExplainGitHub API Docs</title>
+    <meta
+      name="description"
+      content="ExplainGitHub API documentation for repository intelligence, workflows, authentication, billing, and agent endpoints."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a href="/" data-route="/" class="brand">
+        <span class="brand-mark">EG</span>
+        <span class="brand-copy">
+          <strong>ExplainGitHub</strong>
+          <span>Developer Platform</span>
+        </span>
+      </a>
+
+      <nav class="topnav">
+        <a href="/" data-route="/" class="top-link">Home</a>
+        <a href="/quickstart" data-route="/quickstart" class="top-link">Quickstart</a>
+        <a href="/authentication" data-route="/authentication" class="top-link">Authentication</a>
+        <a href="/billing" data-route="/billing" class="top-link">Billing</a>
+      </nav>
+
+      <div class="topbar-right">
+        <label class="search-shell" for="searchInput">
+          <span class="search-label">Search</span>
+          <input id="searchInput" class="search" placeholder="Endpoints, guides, auth..." />
+        </label>
+        <a class="dashboard-btn" href="https://explaingithub.com/dashboard/api" target="_blank" rel="noreferrer">API Dashboard &#8599;</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="section-title">Get started</div>
+        <a href="/" data-route="/" class="nav-item">Overview</a>
+        <a href="/quickstart" data-route="/quickstart" class="nav-item">Quickstart</a>
+        <a href="/authentication" data-route="/authentication" class="nav-item">Authentication</a>
+        <a href="/rate-limits" data-route="/rate-limits" class="nav-item">Rate limits</a>
+        <a href="/billing" data-route="/billing" class="nav-item">Billing</a>
+        <a href="/curl-examples" data-route="/curl-examples" class="nav-item">cURL examples</a>
+
+        <div class="section-title">API reference</div>
+        <a href="/api/health" data-route="/api/health" class="nav-item">GET /api/health</a>
+        <a href="/api/query" data-route="/api/query" class="nav-item">POST /api/query</a>
+        <a href="/api/chat-with-repo" data-route="/api/chat-with-repo" class="nav-item">POST /api/chat-with-repo</a>
+        <a href="/api/issues-chat" data-route="/api/issues-chat" class="nav-item">POST /api/issues/chat</a>
+        <a href="/api/pull-requests-chat" data-route="/api/pull-requests-chat" class="nav-item">POST /api/pull-requests/chat</a>
+        <a href="/api/workflows-chat" data-route="/api/workflows-chat" class="nav-item">POST /api/workflows/chat</a>
+        <a href="/api/agent-chat" data-route="/api/agent-chat" class="nav-item">POST /api/agent/chat</a>
+        <a href="/api/repo-activity" data-route="/api/repo-activity" class="nav-item">GET /api/repos/{repo_id}/activity</a>
+        <a href="/api/usage" data-route="/api/usage" class="nav-item">GET /api/usage</a>
+        <a href="/api/usage-logs" data-route="/api/usage-logs" class="nav-item">GET /api/usage/logs</a>
+        <a href="/api/repos-register" data-route="/api/repos-register" class="nav-item">POST /api/repos/register</a>
+      </aside>
+
+      <main class="content">
+        <div id="page"></div>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
