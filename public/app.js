@@ -53,6 +53,15 @@ const repoRegisterRequestBody = `{
   "credential_id": "optional-for-public-required-for-private"
 }`;
 
+const developerAskRequestBody = `{
+  "question": "What changed recently in main?",
+  "repo": "owner/repo",
+  "branch": "main",
+  "include": ["code", "commits", "prs"],
+  "context": "Focus on the last week.",
+  "suggest_followups": true
+}`;
+
 const quickCode = buildCodeSamples("POST", "/api/query", quickRequestBody);
 const homeIcons = {
   communication: `
@@ -627,6 +636,132 @@ const pages = {
   "status": "registered"
 }`,
     errors: ["409 when the same repo URL is already registered under a different organization with attached credentials"],
+  }),
+  "/developer/ask": renderEndpoint({
+    title: "POST /developer/ask",
+    method: "POST",
+    path: "/developer/ask",
+    what: "Runs the developer ask path: a natural-language question against GitHub repositories with agent-style tool selection and synthesis.",
+    why: [
+      "Best entry point when you want agent-style GitHub Q&A with visible tool selection",
+      "Supports repo scoping by repo, repo_id, or branch/include hints",
+      "Returns follow-up suggestions when suggest_followups is true",
+    ],
+    auth: "Authorization Bearer or X-API-Key; X-Org-Id or X-Organization-Id",
+    requestBody: developerAskRequestBody,
+    fields: [
+      "question: required natural-language question (min length 1)",
+      "repo: optional repository as owner/repo or a full GitHub URL",
+      "branch: optional branch to focus on (for example main)",
+      "include: optional list of areas to prioritize; canonical values: code, prs, issues, actions, commits, security",
+      "context: optional free-form notes appended after structured repo/branch/include context",
+      "allowed_tools: optional advanced list to restrict which GitHub MCP tools the agent may call",
+      "suggest_followups: optional boolean, default false",
+      "repo_id: optional alternative to repo; use the repo_id returned from POST /api/repos/register",
+    ],
+    notes: [
+      "Accepts Authorization: Bearer <API_KEY> or X-API-Key: <API_KEY>",
+      "Accepts X-Org-Id: <ORG_ID> or X-Organization-Id: <ORG_ID>",
+    ],
+    response: `{
+  "answer": "string",
+  "selected_tools": ["list_commits", "get_pull_request"],
+  "tool_calls": [
+    { "name": "list_commits", "result": "..." }
+  ],
+  "followup_questions": ["What files were touched?"],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 50,
+    "total_tokens": 150
+  }
+}`,
+    errors: ["401 missing or invalid API key", "403 API key belongs to another org or is revoked", "422 validation error (for example missing or empty question)", "429 throttled or out of credits"],
+  }),
+  "/developer/usage": renderEndpoint({
+    title: "GET /developer/usage",
+    method: "GET",
+    path: "/developer/usage?limit=50",
+    what: "Returns an organization-scoped usage summary with credit balance, aggregate token counts, and recent request logs.",
+    why: [
+      "Build developer-facing billing and observability dashboards",
+      "Shows credit balance, total tokens, credits consumed, and per-request log entries",
+      "Complements GET /api/usage with org-level credit and MCP tool call metrics",
+    ],
+    auth: "Authorization Bearer or X-API-Key; X-Org-Id or X-Organization-Id",
+    requestBody: null,
+    fields: ["Query param: limit optional, 1..200, default 50"],
+    notes: [
+      "Accepts Authorization: Bearer <API_KEY> or X-API-Key: <API_KEY>",
+      "Accepts X-Org-Id: <ORG_ID> or X-Organization-Id: <ORG_ID>",
+    ],
+    response: `{
+  "org_id": "uuid",
+  "credit_balance": "100.00",
+  "total_prompt_tokens": 1234,
+  "total_completion_tokens": 567,
+  "total_tokens": 1801,
+  "total_credits_used": "12.50",
+  "request_count": 42,
+  "logs": [
+    {
+      "id": "uuid",
+      "org_id": "uuid",
+      "api_key_id": "uuid",
+      "request_id": "uuid",
+      "prompt_tokens": 100,
+      "completion_tokens": 50,
+      "total_tokens": 150,
+      "credits_used": "0.10",
+      "azure_call_count": 2,
+      "selected_tools": ["list_commits"],
+      "tool_call_count": 3,
+      "status": "completed",
+      "latency_ms": 2340,
+      "error_message": null,
+      "created_at": "2026-05-30T12:00:00Z"
+    }
+  ]
+}`,
+    errors: ["401 missing or invalid API key", "403 API key belongs to another org or is revoked", "422 validation error (for example limit out of range)"],
+  }),
+  "/ask/stream": renderEndpoint({
+    title: "POST /ask/stream",
+    method: "POST",
+    path: "/ask/stream",
+    what: "Streams the developer ask path as newline-delimited JSON (application/x-ndjson) with planning, tool-call, answer, usage, and completion events.",
+    why: [
+      "Build real-time chat UIs that show progress while the agent plans and calls tools",
+      "Receive the final answer incrementally via answer_completed and answer events",
+      "Capture token usage and final result without polling",
+    ],
+    auth: "Authorization Bearer or X-API-Key; X-Org-Id or X-Organization-Id",
+    requestBody: developerAskRequestBody,
+    requestDescription: "Same AskRequest schema as POST /developer/ask.",
+    fields: [
+      "question: required natural-language question (min length 1)",
+      "repo: optional repository as owner/repo or a full GitHub URL",
+      "branch: optional branch to focus on (for example main)",
+      "include: optional list of areas to prioritize; canonical values: code, prs, issues, actions, commits, security",
+      "context: optional free-form notes appended after structured repo/branch/include context",
+      "allowed_tools: optional advanced list to restrict which GitHub MCP tools the agent may call",
+      "suggest_followups: optional boolean, default false",
+      "repo_id: optional alternative to repo; use the repo_id returned from POST /api/repos/register",
+    ],
+    notes: [
+      "Response Content-Type is application/x-ndjson (one JSON object per line)",
+      "Event types: planning, tool-call, answer_completed, answer, usage, completed, done",
+      "Accepts Authorization: Bearer <API_KEY> or X-API-Key: <API_KEY>",
+      "Accepts X-Org-Id: <ORG_ID> or X-Organization-Id: <ORG_ID>",
+    ],
+    response: `{"type":"planning","message":"Gathering context..."}
+{"type":"tool-call","name":"list_commits","args":{"sha":"main"}}
+{"type":"answer_completed","answer":"The recent changes include..."}
+{"type":"answer","answer":"The recent changes include..."}
+{"type":"usage","prompt_tokens":100,"completion_tokens":50,"total_tokens":150}
+{"type":"completed","answer":"The recent changes include...","selected_tools":["list_commits"]}
+{"type":"done"}`,
+    errors: ["401 missing or invalid API key", "403 API key belongs to another org or is revoked", "422 validation error (for example missing or empty question)", "429 throttled or out of credits"],
   }),
 };
 

@@ -45,6 +45,12 @@ In practice that means you can:
 - `GET /api/usage/logs`
 - `GET /health`
 
+## Developer Endpoints
+
+- `POST /developer/ask`
+- `GET /developer/usage`
+- `POST /ask/stream`
+
 ## Choosing The Right Endpoint
 
 Use `POST /api/query` when you want a compact intelligence answer over one or more registered repositories, especially for broad operational questions.
@@ -1137,3 +1143,221 @@ A few behaviors are still transitional and should be documented clearly for exte
 - some endpoints still have inconsistent error semantics inherited from older router code
 
 Those caveats are worth being explicit about in public docs, because the API is much easier to trust when developers understand both what it already does well and what is still evolving.
+
+---
+
+### `POST /developer/ask`
+
+What it does:
+
+- Runs the developer ask path: a natural-language question against GitHub repositories with agent-style tool selection and synthesis.
+- Returns a complete answer plus tool call metadata, optional follow-up questions, and token usage.
+
+Why this endpoint is useful:
+
+- best entry point when you want agent-style GitHub Q&A with visible tool selection
+- supports repo scoping by `repo`, `repo_id`, or branch/include hints
+- returns follow-up suggestions when `suggest_followups` is true
+
+Authentication:
+
+- `Authorization: Bearer <API_KEY>` OR `X-API-Key: <API_KEY>`
+- `X-Org-Id: <ORG_ID>` OR `X-Organization-Id: <ORG_ID>`
+
+Request body:
+
+```json
+{
+  "question": "What changed recently in main?",
+  "repo": "owner/repo",
+  "branch": "main",
+  "include": ["code", "commits", "prs"],
+  "context": "Focus on the last week.",
+  "suggest_followups": true
+}
+```
+
+Fields:
+
+- `question`: required natural-language question (min length 1)
+- `repo`: optional repository as `owner/repo` or a full GitHub URL
+- `branch`: optional branch to focus on (for example `main`)
+- `include`: optional list of areas to prioritize; canonical values: `code`, `prs`, `issues`, `actions`, `commits`, `security`; aliases such as `pull_requests`, `workflows`, and `deployments` are accepted
+- `context`: optional free-form notes appended after structured repo/branch/include context
+- `allowed_tools`: optional advanced list to restrict which GitHub MCP tools the agent may call
+- `suggest_followups`: optional boolean, default `false`
+- `repo_id`: optional alternative to `repo`; use the `repo_id` returned from `POST /api/repos/register`
+
+Success response:
+
+```json
+{
+  "answer": "string",
+  "selected_tools": ["list_commits", "get_pull_request"],
+  "tool_calls": [
+    { "name": "list_commits", "result": "..." }
+  ],
+  "followup_questions": ["What files were touched?"],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 50,
+    "total_tokens": 150
+  }
+}
+```
+
+Example:
+
+```bash
+curl -X POST "https://api.explaingithub.com/developer/ask" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "X-Organization-Id: YOUR_ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d "{\"question\":\"What changed recently in main?\",\"repo\":\"owner/repo\",\"branch\":\"main\"}"
+```
+
+Common errors:
+
+- `401` missing or invalid API key
+- `403` API key belongs to another org or is revoked
+- `422` validation error (for example missing or empty `question`)
+- `429` throttled or out of credits
+
+---
+
+### `GET /developer/usage`
+
+What it does:
+
+- Returns an organization-scoped usage summary with credit balance, aggregate token counts, and recent request logs.
+
+Why this endpoint is useful:
+
+- build developer-facing billing and observability dashboards
+- shows credit balance, total tokens, credits consumed, and per-request log entries
+- complements `GET /api/usage` with org-level credit and MCP tool call metrics
+
+Authentication:
+
+- `Authorization: Bearer <API_KEY>` OR `X-API-Key: <API_KEY>`
+- `X-Org-Id: <ORG_ID>` OR `X-Organization-Id: <ORG_ID>`
+
+Query params:
+
+- `limit`: optional, `1..200`, default `50`
+
+Success response:
+
+```json
+{
+  "org_id": "uuid",
+  "credit_balance": "100.00",
+  "total_prompt_tokens": 1234,
+  "total_completion_tokens": 567,
+  "total_tokens": 1801,
+  "total_credits_used": "12.50",
+  "request_count": 42,
+  "logs": [
+    {
+      "id": "uuid",
+      "org_id": "uuid",
+      "api_key_id": "uuid",
+      "request_id": "uuid",
+      "prompt_tokens": 100,
+      "completion_tokens": 50,
+      "total_tokens": 150,
+      "credits_used": "0.10",
+      "azure_call_count": 2,
+      "selected_tools": ["list_commits"],
+      "tool_call_count": 3,
+      "status": "completed",
+      "latency_ms": 2340,
+      "error_message": null,
+      "created_at": "2026-05-30T12:00:00Z"
+    }
+  ]
+}
+```
+
+Example:
+
+```bash
+curl -X GET "https://api.explaingithub.com/developer/usage?limit=50" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "X-Organization-Id: YOUR_ORG_ID"
+```
+
+Common errors:
+
+- `401` missing or invalid API key
+- `403` API key belongs to another org or is revoked
+- `422` validation error (for example `limit` out of range)
+
+---
+
+### `POST /ask/stream`
+
+What it does:
+
+- Streams the developer ask path as newline-delimited JSON (`application/x-ndjson`).
+- Emits planning, tool-call, answer, usage, and completion events as the agent works.
+
+Why this endpoint is useful:
+
+- build real-time chat UIs that show progress while the agent plans and calls tools
+- receive the final answer incrementally via `answer_completed` and `answer` events
+- capture token usage and final result without polling
+
+Authentication:
+
+- `Authorization: Bearer <API_KEY>` OR `X-API-Key: <API_KEY>`
+- `X-Org-Id: <ORG_ID>` OR `X-Organization-Id: <ORG_ID>`
+
+Request body:
+
+Same schema as `POST /developer/ask` (`AskRequest`).
+
+Response:
+
+- Content-Type: `application/x-ndjson`
+- One JSON object per line; each object has a `type` field
+
+Event types:
+
+- `planning`: agent is planning next steps
+- `tool-call`: agent invoked a GitHub MCP tool
+- `answer_completed`: full answer text is available
+- `answer`: answer text (may repeat or refine `answer_completed`)
+- `usage`: token usage for the request (`prompt_tokens`, `completion_tokens`, `total_tokens`)
+- `completed`: final result payload including answer and selected tools
+- `done`: stream finished; no further events
+
+Example stream:
+
+```
+{"type":"planning","message":"Gathering context..."}
+{"type":"tool-call","name":"list_commits","args":{"sha":"main"}}
+{"type":"answer_completed","answer":"The recent changes include..."}
+{"type":"answer","answer":"The recent changes include..."}
+{"type":"usage","prompt_tokens":100,"completion_tokens":50,"total_tokens":150}
+{"type":"completed","answer":"The recent changes include...","selected_tools":["list_commits"]}
+{"type":"done"}
+```
+
+Example:
+
+```bash
+curl -X POST "https://api.explaingithub.com/ask/stream" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "X-Organization-Id: YOUR_ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/x-ndjson" \
+  -d "{\"question\":\"What changed recently in main?\",\"repo\":\"owner/repo\",\"branch\":\"main\"}"
+```
+
+Common errors:
+
+- `401` missing or invalid API key
+- `403` API key belongs to another org or is revoked
+- `422` validation error (for example missing or empty `question`)
+- `429` throttled or out of credits
